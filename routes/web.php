@@ -8,6 +8,7 @@ use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\ChangelogController;
 use App\Http\Controllers\Cli\ScriptController;
 use App\Http\Controllers\CommitApprovalController;
+use App\Http\Controllers\CommitContinuationController;
 use App\Http\Controllers\CommitController;
 use App\Http\Controllers\CommitImageController;
 use App\Http\Controllers\CommitLinkPreviewController;
@@ -187,6 +188,8 @@ Route::get('commits/{commit}/status', [CommitStatusController::class, 'show'])
 Route::get('commits/{commit}/replies', [CommitReplyController::class, 'index'])
     ->withTrashed()
     ->name('commit-reply.index');
+Route::get('commits/{commit}/continuation', [CommitContinuationController::class, 'index'])
+    ->name('commit-continuation.index');
 
 // Search...
 Route::get('search', [SearchController::class, 'index'])

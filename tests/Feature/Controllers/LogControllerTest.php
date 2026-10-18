@@ -587,6 +587,21 @@ it('offers the commit just committed on top of the ranked log', function (): voi
             ->where('latestCommits.0.body', 'Initial commit'));
 });
 
+it('points feed commits to the rest of their author thread instead of previewing it', function (): void {
+    $viewer = User::factory()->create();
+    $thread = Commit::factory()->create();
+    Commit::factory()->for($thread, 'parent')->create(['body' => 'Someone else', 'created_at' => now()->subMinutes(2)]);
+    $next = Commit::factory()->for($thread, 'parent')->for($thread->user)->create(['body' => 'Part two', 'created_at' => now()->subMinute()]);
+
+    $this->actingAs($viewer)->get(route('log.show', 'latest'))->assertOk()->assertInertia(fn ($page) => $page
+        ->where('commits.data.0.id', $thread->id)
+        ->where('commits.data.0.continuation_id', $next->id)
+        ->where('commits.data.0.replies_count', 1)
+        ->has('commits.data.0.reply_preview.data', 1)
+        ->where('commits.data.0.reply_preview.data.0.body', 'Someone else')
+        ->where('commits.data.0.reply_preview.next_cursor', null));
+});
+
 it('preloads the latest reply per feed commit with a cursor to the older replies', function (): void {
     $viewer = User::factory()->create();
     $parents = Commit::factory()->for($viewer)->count(2)->create();
