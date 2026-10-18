@@ -4,6 +4,7 @@ import {
     Bell,
     Bookmark,
     GitCommitVertical,
+    MessagesSquare,
     Search,
     Settings2,
     ShieldCheck,
@@ -11,7 +12,9 @@ import {
     UserRound,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import BookmarkController from '@/actions/App/Http/Controllers/BookmarkController';
+import ConversationController from '@/actions/App/Http/Controllers/ConversationController';
 import LogController from '@/actions/App/Http/Controllers/LogController';
 import ModerationController from '@/actions/App/Http/Controllers/ModerationController';
 import NotificationController from '@/actions/App/Http/Controllers/NotificationController';
@@ -27,6 +30,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserAvatar } from '@/components/user-avatar';
 import { UserMenuContent } from '@/components/user-menu-content';
+import { useUnreadMessages } from '@/hooks/use-chat';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useKeyLabels } from '@/lib/keyboard';
 import { cn, toUrl } from '@/lib/utils';
@@ -42,6 +46,7 @@ function useNavItems(): (NavItem & { isActive: boolean })[] {
     const { auth, hasUnmoderatedCommits } = usePage().props;
     const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
     const { user, log } = auth;
+    const unreadMessages = useUnreadMessages();
 
     const hrefFor = (
         href: (user: Profile, log: Log) => NavItem['href'],
@@ -62,6 +67,18 @@ function useNavItems(): (NavItem & { isActive: boolean })[] {
             badge: auth.unreadNotificationsCount,
             prefetch: false,
         },
+        ...(auth.remotes !== null
+            ? [
+                  {
+                      title: 'Remotes',
+                      description: 'Direct messages',
+                      href: ConversationController.index(),
+                      icon: MessagesSquare,
+                      badge: unreadMessages,
+                      prefetch: false,
+                  },
+              ]
+            : []),
         {
             title: 'Profile',
             href: hrefFor((user) => show(user)),
@@ -104,7 +121,9 @@ function useNavItems(): (NavItem & { isActive: boolean })[] {
                 ? isCurrentOrParentUrl('/settings')
                 : item.title === 'Log'
                   ? isCurrentOrParentUrl('/log')
-                  : isCurrentUrl(item.href)),
+                  : item.title === 'Remotes'
+                    ? isCurrentOrParentUrl('/remotes')
+                    : isCurrentUrl(item.href)),
     }));
 }
 
@@ -124,7 +143,11 @@ function NavLink({
 
     if (auth.user === null) {
         return (
-            <a href={toUrl(item.href)} className={className}>
+            <a
+                href={toUrl(item.href)}
+                title={item.description}
+                className={className}
+            >
                 {children}
             </a>
         );
@@ -136,6 +159,7 @@ function NavLink({
             prefetch={item.prefetch ?? true}
             viewTransition
             aria-current={item.isActive ? 'page' : undefined}
+            title={item.description}
             className={className}
         >
             {children}
@@ -273,6 +297,18 @@ export function AppNav({
                         {keys.combo(keys.mod, 'K')}
                     </kbd>
                 </button>
+                <a
+                    href="https://github.com/nunomaduro/dev-null.sh"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Source code (opens in a new tab)"
+                    title="Source code"
+                    className="flex items-center gap-3 rounded-lg p-3 text-[15px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    data-test="source-code-link"
+                >
+                    <GitHubIcon className="size-5" />
+                    <span className="sr-only lg:not-sr-only">Source code</span>
+                </a>
             </nav>
 
             <Button
@@ -370,13 +406,41 @@ export function MobileHeader({ onSearch }: { onSearch: () => void }) {
     );
 }
 
+/**
+ * Shares its real height, safe area included, as `--mobile-nav-height`, so full-screen pages can end right above it.
+ */
 export function MobileNav() {
     const items = useNavItems().filter(
         (item) => !['Saved', 'Operations'].includes(item.title),
     );
+    const nav = useRef<HTMLElement>(null);
+
+    useLayoutEffect(() => {
+        const element = nav.current;
+
+        if (element === null) {
+            return;
+        }
+
+        const root = document.documentElement;
+        const observer = new ResizeObserver(() =>
+            root.style.setProperty(
+                '--mobile-nav-height',
+                `${element.getBoundingClientRect().height}px`,
+            ),
+        );
+
+        observer.observe(element, { box: 'border-box' });
+
+        return () => {
+            observer.disconnect();
+            root.style.removeProperty('--mobile-nav-height');
+        };
+    }, []);
 
     return (
         <nav
+            ref={nav}
             aria-label="Main"
             className="fixed inset-x-0 bottom-0 z-20 flex border-t bg-card pb-[env(safe-area-inset-bottom)] [view-transition-name:mobile-nav] md:hidden"
         >

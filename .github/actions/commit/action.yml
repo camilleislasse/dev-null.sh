@@ -14,7 +14,7 @@ inputs:
     required: false
     default: ''
   images:
-    description: Paths of JPEG, PNG, GIF or WebP files to attach, one per line, up to 3.
+    description: Paths of JPEG, PNG or WebP files to attach, one per line, up to 3.
     required: false
     default: ''
   url:

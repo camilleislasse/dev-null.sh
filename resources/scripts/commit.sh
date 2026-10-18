@@ -7,7 +7,7 @@
 #   curl -fsSL __DEVNULL_URL__/commit | bash -s -- --image shipped.png 'Shipped!'
 #
 # `--reply` takes the hash of a commit (as shown on /dev/null) or its link. `--image` takes the
-# path of a JPEG, PNG, GIF or WebP file of up to 10 MB, up to 3 times. A `--` ends the options,
+# path of a JPEG, PNG or WebP file of up to 10 MB, up to 3 times. A `--` ends the options,
 # for a message that starts with one of them.
 #
 # There is no login: your commit is signed locally with an SSH key that is on your GitHub

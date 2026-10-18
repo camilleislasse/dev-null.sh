@@ -12,6 +12,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rules\Dimensions;
+use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Rules\File;
 
 /**
@@ -25,18 +26,19 @@ final class CreateCliCommitRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string|ValidationRule|File|Dimensions>>
+     * @return array<string, array<int, string|ValidationRule|File|Dimensions|Enum>>
      */
     public function rules(): array
     {
         $user = $this->user();
         assert($user instanceof User);
+        $attachmentRules = CreateCommitRequest::attachmentRules();
 
         return [
             'body' => CreateCommitRequest::BODY_RULES,
             'reply_to' => ['nullable', 'string', new CommitReference($user)],
-            'images' => CreateCommitRequest::imageListRules(),
-            'images.*' => CreateCommitRequest::imageRules(),
+            'images' => $attachmentRules['images'],
+            'images.*' => $attachmentRules['images.*'],
         ];
     }
 
@@ -55,7 +57,9 @@ final class CreateCliCommitRequest extends FormRequest
      */
     public function images(): array
     {
-        return CreateCommitRequest::imagesFrom($this);
+        $images = $this->file('images');
+
+        return is_array($images) ? array_values($images) : [];
     }
 
     public function prepareForValidation(): void

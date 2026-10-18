@@ -39,7 +39,7 @@ const inputs = [
     {
         name: 'images',
         description:
-            'Optional. Paths of JPEG, PNG, GIF or WebP files to attach, one per line, up to 3.',
+            'Optional. Paths of JPEG, PNG or WebP files to attach, one per line, up to 3.',
     },
 ];
 
