@@ -24,6 +24,12 @@ import {
     ReplyGhost,
 } from '@/components/chat/message-parts';
 import type { Author } from '@/components/chat/message-parts';
+import {
+    ReactionBar,
+    ReactionChips,
+    ReactionSheet,
+    useTouchReactions,
+} from '@/components/chat/message-reactions';
 import { MessageStatusGlyph } from '@/components/chat/message-status';
 import { EventLine, typingText } from '@/components/chat/org';
 import {
@@ -38,9 +44,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { UserAvatar } from '@/components/user-avatar';
-import { useThread } from '@/hooks/use-chat';
+import { useChat, useThread } from '@/hooks/use-chat';
 import { useImageAttachments } from '@/hooks/use-image-attachments';
 import { useLinkCard } from '@/hooks/use-link-card';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useSecretWarning } from '@/hooks/use-secret-warning';
 import { moveCaretToEnd, useStash } from '@/hooks/use-stash';
 import {
@@ -52,8 +59,11 @@ import {
     sendMessage,
     setReplyingTo,
     targetKey,
+    toggleReaction,
 } from '@/lib/chat';
 import type { ChatTarget, PendingMessage } from '@/lib/chat';
+import { doubleTapReaction } from '@/lib/reactions';
+import type { ReactionUsage } from '@/lib/reactions';
 import {
     characterCount,
     cn,
@@ -74,6 +84,8 @@ const maxLength = 2000;
 const noMessages: Message[] = [];
 
 const noPending: PendingMessage[] = [];
+
+const noUsage: ReactionUsage[] = [];
 
 const countFrom = maxLength * 0.8;
 
@@ -126,6 +138,7 @@ export function ConversationThread({
     onDropped?: () => void;
 }) {
     const thread = useThread(target);
+    const usage = useChat().reactionUsage ?? noUsage;
     const isOrg = target.kind === 'org';
     // Renaming an org updates the thread's target, not the one this was opened with.
     const current = thread?.target ?? target;
@@ -216,6 +229,20 @@ export function ConversationThread({
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [targetKey(target)],
+    );
+
+    const react = useCallback(
+        (messageId: number, emoji: string) => {
+            void toggleReaction(target, messageId, emoji, user.id).then(
+                (isSaved) => {
+                    if (!isSaved) {
+                        toast.error('Could not react. Try again.');
+                    }
+                },
+            );
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [targetKey(target), user.id],
     );
 
     useEffect(() => {
@@ -392,6 +419,8 @@ export function ConversationThread({
                                 authorOf={authorOf}
                                 onJump={jumpTo}
                                 onReply={isOpen ? replyTo : null}
+                                usage={usage}
+                                onReact={isOpen ? react : null}
                             />
                         ))}
                     </ol>
@@ -565,6 +594,8 @@ const ThreadItem = memo(function ThreadItem({
     authorOf,
     onJump,
     onReply,
+    usage,
+    onReact,
 }: {
     item: Item;
     pulls: Pulls;
@@ -576,6 +607,8 @@ const ThreadItem = memo(function ThreadItem({
     authorOf: (userId: string) => Author;
     onJump: (id: number) => void;
     onReply: ((reply: MessageReply) => void) | null;
+    usage: ReactionUsage[];
+    onReact: ((messageId: number, emoji: string) => void) | null;
 }) {
     if (item.kind === 'day') {
         return (
@@ -658,6 +691,8 @@ const ThreadItem = memo(function ThreadItem({
                         authorOf={authorOf}
                         onJump={onJump}
                         onReply={onReply}
+                        usage={usage}
+                        onReact={onReact}
                     />
                 );
             })}
@@ -695,6 +730,8 @@ function BubbleWithMeta({
     authorOf,
     onJump,
     onReply,
+    usage,
+    onReact,
 }: {
     bubble: Bubble;
     isMine: boolean;
@@ -707,7 +744,10 @@ function BubbleWithMeta({
     authorOf: (userId: string) => Author;
     onJump: (id: number) => void;
     onReply: ((reply: MessageReply) => void) | null;
+    usage: ReactionUsage[];
+    onReact: ((messageId: number, emoji: string) => void) | null;
 }) {
+    const [isReacting, setIsReacting] = useState(false);
     const message =
         bubble.kind === 'message'
             ? bubble.message
@@ -756,16 +796,53 @@ function BubbleWithMeta({
                   })
             : null;
 
+    const reactions =
+        bubble.kind === 'message' ? bubble.message.reactions : undefined;
+    const reacted = useMemo(
+        () =>
+            new Set(
+                (reactions ?? [])
+                    .filter((reaction) => reaction.user_id === user.id)
+                    .map((reaction) => reaction.emoji),
+            ),
+        [reactions, user.id],
+    );
+    const reactToThis =
+        onReact !== null && bubble.kind === 'message'
+            ? (emoji: string) => onReact(bubble.message.id, emoji)
+            : null;
+    const touch = useTouchReactions(
+        reactToThis === null
+            ? null
+            : {
+                  onLongPress: () => setIsReacting(true),
+                  onDoubleTap: () => reactToThis(doubleTapReaction),
+              },
+    );
+
     return (
         <>
             <Repliable isMine={isMine} onReply={replyToThis}>
                 <div
                     className={cn(
-                        'flex max-w-[85%] min-w-0 flex-col gap-1',
+                        'relative flex max-w-[85%] min-w-0 flex-col gap-1',
                         isCompact ? 'max-w-[88%]' : 'sm:max-w-[78%]',
                         isMine ? 'items-end' : 'items-start',
+                        {
+                            '[-webkit-touch-callout:none] pointer-coarse:select-none':
+                                reactToThis !== null,
+                        },
                     )}
+                    {...touch}
                 >
+                    {reactToThis !== null && (
+                        <ReactionBar
+                            usage={usage}
+                            reacted={reacted}
+                            isMine={isMine}
+                            onReact={reactToThis}
+                        />
+                    )}
                     {reply !== null && (
                         <ReplyGhost
                             reply={reply}
@@ -821,8 +898,44 @@ function BubbleWithMeta({
                     {bubble.kind === 'message' && (
                         <MessageLinkCard message={bubble.message} />
                     )}
+                    <ReactionChips
+                        reactions={reactions}
+                        userId={user.id}
+                        isMine={isMine}
+                        nameOf={(userId) => authorOf(userId).name}
+                        onToggle={reactToThis}
+                    />
                 </div>
             </Repliable>
+
+            {reactToThis !== null && (
+                <ReactionSheet
+                    isOpen={isReacting}
+                    onOpenChange={setIsReacting}
+                    usage={usage}
+                    reacted={reacted}
+                    isMine={isMine}
+                    body={message.body}
+                    preview={
+                        message.body === '' ? null : (
+                            <div
+                                className={cn(
+                                    'w-fit max-w-full rounded-lg px-3.5 py-2 text-[15px] wrap-anywhere shadow-[0_12px_30px_-12px_rgb(0_0_0/0.45)]',
+                                    isMine
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted text-foreground',
+                                )}
+                            >
+                                <MessageText
+                                    message={message}
+                                    isMine={isOnPrimary}
+                                />
+                            </div>
+                        )
+                    }
+                    onReact={reactToThis}
+                />
+            )}
 
             {status === 'rejected' ? (
                 <MetaLine className="text-destructive">
@@ -988,6 +1101,7 @@ function Composer({
     onSend: () => void;
 }) {
     const id = `message-${targetKey(target).replace(':', '-')}`;
+    const isMobile = useIsMobile();
     const placeholder =
         target.kind === 'direct'
             ? `Message @${target.partner.username}`
@@ -1033,7 +1147,12 @@ function Composer({
         linkCard.reset();
         setReplyingTo(target, null);
         showError(null);
-        input.current?.focus();
+
+        if (isMobile) {
+            input.current?.blur();
+        } else {
+            input.current?.focus();
+        }
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1198,6 +1317,7 @@ function Composer({
                     <MentionTextarea
                         id={id}
                         ref={input}
+                        org={target.kind === 'org' ? target.org.id : undefined}
                         rows={1}
                         autoFocus={autoFocus}
                         value={body}

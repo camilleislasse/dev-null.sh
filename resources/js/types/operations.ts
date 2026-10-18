@@ -37,3 +37,9 @@ export type GitHubRateLimit = {
     limit: number;
     resets_at: string;
 };
+
+export type Traffic = {
+    current: number;
+    day: { visitors: number; pageviews: number };
+    week: { visitors: number; pageviews: number };
+};

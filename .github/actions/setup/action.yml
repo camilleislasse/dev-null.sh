@@ -23,9 +23,9 @@ runs:
       uses: oven-sh/setup-bun@v2
 
     - name: Setup Vite+
-      uses: voidzero-dev/setup-vp@v1.21.1
+      uses: voidzero-dev/setup-vp@v1.21.2
       with:
-        node-version: 24
+        node-version: 26
         # Dependencies are installed with Bun below, from cache when possible.
         run-install: false
 

@@ -120,7 +120,7 @@ Sources: [composer](resources/js/components/commit-composer.tsx), [commit model]
 
 Commit and reply text supports inline code in backticks and fenced code blocks with syntax highlighting and a copy control. Text outside code supports emoji shortcodes, clickable URLs, and `@username` mentions. This is developer-oriented text formatting, not a full rich-text editor.
 
-Typing **@** in a composer opens developer suggestions. Use ↑/↓ to move, Enter or Tab to select, and Esc to dismiss. A bare @ suggests people you follow; typing more searches names and usernames. Mentions link to profiles and can notify the mentioned developer after approval. Email addresses and scoped packages such as `@inertiajs/react` are not treated as mentions.
+Typing **@** in a composer opens developer suggestions. Use ↑/↓ to move, Enter or Tab to select, and Esc to dismiss. A bare @ suggests people you follow; typing more searches names and usernames. In an org's messages, suggestions are limited to the org's members. Mentions link to profiles and can notify the mentioned developer after approval. Email addresses and scoped packages such as `@inertiajs/react` are not treated as mentions.
 
 Sources: [body renderer](resources/js/components/commit-body.tsx), [code blocks](resources/js/components/code-block.tsx), [mention suggestions](app/Http/Controllers/MentionSuggestionController.php), [mention parsing](app/Services/Mentions.php).
 
@@ -349,7 +349,7 @@ Sources: [moderation access](app/Http/Requests/ShowModerationRequest.php), [mode
 
 ### Operations dashboard
 
-Administrators can open `/operations` to inspect database and cache connectivity, queue backlogs, recent failed jobs, pending moderation, link-preview health, and recent signup/commit/reply volume. The GitHub API rate limit is shown when credentials are configured. The dashboard refreshes periodically and offers retry or forget controls for failed jobs. Non-admin users cannot access it.
+Administrators can open `/operations` to inspect database and cache connectivity, queue backlogs, recent failed jobs, pending moderation, link-preview health, and recent signup/commit/reply volume. The GitHub API rate limit is shown when credentials are configured, and Fathom site traffic (visitors on the site now, and visitors and pageviews over 24 hours and 7 days) when a Fathom API token is configured. The dashboard refreshes periodically and offers retry or forget controls for failed jobs. Non-admin users cannot access it.
 
 Sources: [operations controller](app/Http/Controllers/OperationsController.php), [access check](app/Http/Requests/ShowOperationsRequest.php), [operations page](resources/js/pages/operations/show.tsx).
 

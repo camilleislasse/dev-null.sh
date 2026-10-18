@@ -32,6 +32,7 @@ import type {
     GitHubRateLimit,
     LinkPreviewHealth,
     QueueBacklog,
+    Traffic,
     Volume,
 } from '@/types';
 
@@ -47,6 +48,7 @@ const PAGE_PROPS = [
     'pendingModerationCount',
     'volume',
     'githubRateLimit',
+    'traffic',
 ];
 
 const LEAVE_DELAY_MS = 700;
@@ -217,6 +219,94 @@ function GitHubRateLimitSkeleton() {
                 </span>
             </div>
             <Skeleton className="h-1 max-w-56 rounded-full" />
+        </div>
+    );
+}
+
+function TrafficValue({ traffic }: { traffic: Traffic | null | undefined }) {
+    if (!traffic) {
+        return (
+            <div className="rounded-lg border px-4 py-2.5 text-sm">
+                <Status isUp={false}>
+                    unavailable
+                    <span className="font-normal text-muted-foreground">
+                        Fathom didn't answer
+                    </span>
+                </Status>
+            </div>
+        );
+    }
+
+    const rows = [
+        {
+            label: 'visitors',
+            day: traffic.day.visitors,
+            week: traffic.week.visitors,
+        },
+        {
+            label: 'pageviews',
+            day: traffic.day.pageviews,
+            week: traffic.week.pageviews,
+        },
+    ];
+
+    return (
+        <div className="rounded-lg border px-4">
+            <table className="w-full table-fixed text-sm">
+                <thead>
+                    <tr className="font-mono text-[13px] text-muted-foreground">
+                        <th
+                            scope="col"
+                            className="py-2.5 text-left font-normal"
+                        >
+                            <span className="sr-only">What</span>
+                        </th>
+                        <th
+                            scope="col"
+                            className="w-20 py-2.5 text-right font-normal sm:w-24"
+                        >
+                            24h
+                        </th>
+                        <th
+                            scope="col"
+                            className="w-20 py-2.5 text-right font-normal sm:w-24"
+                        >
+                            7d
+                        </th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y border-t">
+                    {rows.map((row) => (
+                        <tr key={row.label}>
+                            <th
+                                scope="row"
+                                className="py-2.5 text-left font-mono text-[13px] font-normal text-muted-foreground"
+                            >
+                                {row.label}
+                            </th>
+                            <td className="py-2.5 text-right font-mono text-[13px] font-medium tabular-nums">
+                                {formatCount(row.day)}
+                            </td>
+                            <td className="py-2.5 text-right font-mono text-[13px] tabular-nums">
+                                {formatCount(row.week)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function TrafficSkeleton() {
+    return (
+        <div
+            aria-hidden
+            className="animate-in space-y-3 rounded-lg border px-4 py-3 delay-300 duration-300 fill-mode-both fade-in"
+        >
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-full" />
         </div>
     );
 }
@@ -404,6 +494,7 @@ export default function Show({
     pendingModerationCount,
     volume,
     githubRateLimit,
+    traffic,
 }: {
     queues: QueueBacklog[];
     failedJobs: FailedJobs;
@@ -412,6 +503,7 @@ export default function Show({
     pendingModerationCount: number;
     volume: Volume;
     githubRateLimit?: GitHubRateLimit | null;
+    traffic?: Traffic | null;
 }) {
     const { deferredProps } = usePage();
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -439,11 +531,15 @@ export default function Show({
         });
     };
 
-    const tracksGitHub =
-        githubRateLimit !== undefined ||
+    const isDeferred = (prop: string) =>
         Object.values(deferredProps ?? {})
             .flat()
-            .includes('githubRateLimit');
+            .includes(prop);
+
+    const tracksGitHub =
+        githubRateLimit !== undefined || isDeferred('githubRateLimit');
+
+    const tracksTraffic = traffic !== undefined || isDeferred('traffic');
 
     const volumeRows = [
         { label: 'signups', counts: volume.signups },
@@ -690,6 +786,21 @@ export default function Show({
                     </table>
                 </div>
             </Section>
+
+            {tracksTraffic && (
+                <Section
+                    title="Traffic"
+                    meta={
+                        traffic
+                            ? `${formatCount(traffic.current)} on the site now`
+                            : 'fathom'
+                    }
+                >
+                    <Deferred data="traffic" fallback={<TrafficSkeleton />}>
+                        <TrafficValue traffic={traffic} />
+                    </Deferred>
+                </Section>
+            )}
         </>
     );
 }

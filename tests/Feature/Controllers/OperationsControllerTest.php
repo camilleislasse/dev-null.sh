@@ -36,7 +36,8 @@ it('shows the operational health of the app to admins', function (): void {
             ->where('volume.signups', ['day' => 5, 'week' => 5])
             ->where('volume.commits', ['day' => 3, 'week' => 3])
             ->where('volume.replies', ['day' => 1, 'week' => 1])
-            ->missing('githubRateLimit'));
+            ->missing('githubRateLimit')
+            ->missing('traffic'));
 });
 
 it('shows the GitHub rate limit when GitHub credentials are configured', function (): void {
@@ -70,4 +71,23 @@ it('requires authentication', function (): void {
     $response = $this->get(route('operations.show'));
 
     $response->assertRedirectToRoute('home');
+});
+
+it('shows Fathom traffic when a Fathom token is configured', function (): void {
+    config(['services.fathom.token' => 'token', 'services.fathom.site_id' => 'SITE']);
+
+    Http::fake([
+        'api.usefathom.com/v1/current_visitors*' => Http::response(['total' => 3]),
+        'api.usefathom.com/v1/aggregations*' => Http::response([['uniques' => '120', 'pageviews' => '480']]),
+    ]);
+
+    $response = $this->actingAs(User::factory()->create(['username' => 'admin']))
+        ->get(route('operations.show'));
+
+    $response->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->missing('traffic')
+            ->loadDeferredProps(fn ($reload) => $reload
+                ->where('traffic.current', 3)
+                ->where('traffic.day', ['visitors' => 120, 'pageviews' => 480])));
 });
