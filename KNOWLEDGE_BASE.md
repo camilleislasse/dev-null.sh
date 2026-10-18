@@ -499,9 +499,9 @@ Sources: [metrics controller](app/Http/Controllers/ProductMetricsController.php)
 
 ### About, changelog, and policies
 
-The public **About** page describes the livestream project and its contributors. The **Changelog**, opened from the navigation or the side column, lists the pull requests merged into `production` on GitHub, a few days at a time. The **Brand** page at `/brand` offers the logo, wordmark, colors, typography, and wallpapers; right-clicking the logo in the navigation also copies it or links there. **Terms** and **Privacy** explain acceptable use and data handling. Public posts may be indexed or copied outside /dev/null; content and search queries can be processed by automated or AI services. Read those policies before posting sensitive information or relying on deletion to remove every external copy.
+The public **About** page describes the livestream project and lists everyone with a commit on production, read from GitHub once an hour, most commits first; when GitHub cannot be reached the page says so instead of showing the list. The **Changelog**, opened from the navigation or the side column, lists the pull requests merged into `production` on GitHub, a few days at a time. The **Brand** page at `/brand` offers the logo, wordmark, colors, typography, and wallpapers; right-clicking the logo in the navigation also copies it or links there. **Terms** and **Privacy** explain acceptable use and data handling. Public posts may be indexed or copied outside /dev/null; content and search queries can be processed by automated or AI services. Read those policies before posting sensitive information or relying on deletion to remove every external copy.
 
-Sources: [public page routes](routes/web.php), [About](resources/js/pages/about/show.tsx), [privacy policy](resources/js/pages/privacy/show.tsx), [terms](resources/js/pages/terms/show.tsx).
+Sources: [public page routes](routes/web.php), [About](resources/js/pages/about/show.tsx), [contributors](app/Queries/ContributorsQuery.php), [privacy policy](resources/js/pages/privacy/show.tsx), [terms](resources/js/pages/terms/show.tsx).
 
 ### Tom's repository insights and community statistics
 
