@@ -11,10 +11,10 @@ import {
     ImagePickerPreviews,
     imageErrorFrom,
 } from '@/components/commit-image-picker';
+import { CommitRulesDialog, useCommitRules } from '@/components/commit-rules';
 import InputError from '@/components/input-error';
 import { MentionTextarea } from '@/components/mention-textarea';
 import { QuotedCommit } from '@/components/quoted-commit';
-import { SecretWarning } from '@/components/secret-warning';
 import { StashLabel } from '@/components/stash-label';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +26,6 @@ import {
 import { UserAvatar } from '@/components/user-avatar';
 import { useMarkCommitDeleted } from '@/hooks/use-deleted-resources';
 import { useImageAttachments } from '@/hooks/use-image-attachments';
-import { useSecretWarning } from '@/hooks/use-secret-warning';
 import { moveCaretToEnd, useHasStash, useStash } from '@/hooks/use-stash';
 import { useUser } from '@/hooks/use-user';
 import { signIn } from '@/lib/auth';
@@ -131,7 +130,7 @@ function QuoteComposer({
         stashKey,
     );
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const secrets = useSecretWarning(body);
+    const commitRules = useCommitRules();
     const keys = useKeyLabels();
 
     const isQuotable =
@@ -183,17 +182,16 @@ function QuoteComposer({
                 {...CommitController.store.form()}
                 errorBag="quote"
                 onBefore={() =>
-                    !attachments.isReading() && secrets.beforeSubmit()
+                    !attachments.isReading() && commitRules.beforeSubmit()
                 }
-                transform={(data) =>
-                    images.length > 0
-                        ? {
-                              ...data,
-                              images,
-                              image_descriptions: descriptions,
-                          }
-                        : data
-                }
+                transform={(data) => ({
+                    ...data,
+                    commit_rules_accepted: commitRules.hasAccepted(),
+                    ...(images.length > 0 && {
+                        images,
+                        image_descriptions: descriptions,
+                    }),
+                })}
                 options={{ preserveScroll: true }}
                 onError={(errors) => {
                     if (errors.quoted_commit_id) {
@@ -256,14 +254,9 @@ function QuoteComposer({
                                 message={errors.body ?? errors.quoted_commit_id}
                             />
 
-                            <SecretWarning
-                                body={body}
-                                findings={secrets.findings}
+                            <CommitRulesDialog
+                                rules={commitRules}
                                 textarea={textareaRef}
-                                onChange={updateBody}
-                                confirming={secrets.confirming}
-                                onConfirmingChange={secrets.setConfirming}
-                                onApprove={secrets.approve}
                             />
 
                             <ImagePickerPreviews

@@ -6,7 +6,6 @@ namespace App\Queries;
 
 use App\Services\GitHub;
 use Illuminate\Http\Client\HttpClientException;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Fluent;
 
@@ -34,7 +33,7 @@ final readonly class ContributorsQuery
     }
 
     /**
-     * Everyone with a commit on production, most commits first, as GitHub counts them. A failed read is kept for a
+     * The repository contributors, most commits first, as GitHub counts them. A failed read is kept for a
      * minute, so an outage doesn't send every visitor to GitHub.
      *
      * @return list<Contributor>|null
@@ -48,72 +47,44 @@ final readonly class ContributorsQuery
         $contributors = Cache::get($key);
 
         if ($contributors === null) {
-            $contributors = $this->fetch($repository) ?? false;
+            $contributors = [];
+
+            try {
+                for ($page = 1; $page <= self::MaxPages; $page++) {
+                    $accounts = $this->github->request()->get("repos/{$repository}/contributors", [
+                        'per_page' => self::PerPage,
+                        'page' => $page,
+                    ])->throw()->collect();
+
+                    if ($accounts->isNotEmpty() && ! array_is_list($accounts->all())) {
+                        $contributors = false;
+
+                        break;
+                    }
+
+                    $contributors = [...$contributors, ...$accounts->where('type', 'User')
+                        ->mapInto(Fluent::class)
+                        ->filter(fn (Fluent $account): bool => $account->string('login')->isNotEmpty()
+                            && is_int($account->get('contributions'))
+                            && ! in_array($account->string('login')->lower()->value(), self::Agents, true))
+                        ->map(fn (Fluent $account): array => [
+                            'login' => $account->string('login')->value(),
+                            'commits' => $account->integer('contributions'),
+                        ])
+                        ->values()
+                        ->all()];
+
+                    if ($accounts->count() < self::PerPage) {
+                        break;
+                    }
+                }
+            } catch (HttpClientException) {
+                $contributors = false;
+            }
 
             Cache::put($key, $contributors, $contributors === false ? self::FailedTtl : self::Ttl);
         }
 
         return $contributors === false ? null : $contributors;
-    }
-
-    /**
-     * @return list<Contributor>|null
-     */
-    private function fetch(string $repository): ?array
-    {
-        $people = [];
-
-        for ($page = 1; $page <= self::MaxPages; $page++) {
-            try {
-                $accounts = $this->github->request()->get("repos/{$repository}/contributors", [
-                    'per_page' => self::PerPage,
-                    'page' => $page,
-                ])->throw()->collect();
-            } catch (HttpClientException) {
-                return null;
-            }
-
-            if ($accounts->isNotEmpty() && ! array_is_list($accounts->all())) {
-                return null;
-            }
-
-            $people = [...$people, ...$this->people($accounts)];
-
-            if ($accounts->count() < self::PerPage) {
-                break;
-            }
-        }
-
-        return $people;
-    }
-
-    /**
-     * @param  Collection<int|string, mixed>  $accounts
-     * @return list<Contributor>
-     */
-    private function people(Collection $accounts): array
-    {
-        return array_values($accounts->where('type', 'User')
-            ->mapInto(Fluent::class)
-            ->filter($this->isPerson(...))
-            ->map(fn (Fluent $account): array => [
-                'login' => $account->string('login')->value(),
-                'commits' => $account->integer('contributions'),
-            ])
-            ->all());
-    }
-
-    /**
-     * An account with a name and a count behind it, and not one of the agents.
-     *
-     * @param  Fluent<string, mixed>  $account
-     */
-    private function isPerson(Fluent $account): bool
-    {
-        $login = $account->string('login')->value();
-
-        return $login !== ''
-            && is_int($account->get('contributions'))
-            && ! in_array(mb_strtolower($login), self::Agents, true);
     }
 }

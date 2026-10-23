@@ -109,3 +109,20 @@ it('has nobody to show when GitHub answers with an error or with something that 
     'an error' => [['message' => 'Not Found'], 404],
     'an object' => [['message' => 'Moved'], 200],
 ]);
+
+it('discards a partial list after a later page fails and recovers when the failure expires', function (): void {
+    $firstPage = array_map(fn (int $number): array => gitHubContributor("dev{$number}", 200 - $number), range(1, 100));
+    Http::fake(['api.github.com/repos/'.config()->string('services.github.repository').'/contributors*' => Http::sequence()
+        ->push($firstPage)
+        ->pushStatus(503)
+        ->push([gitHubContributor('recovered', 12)])]);
+
+    expect(resolve(ContributorsQuery::class)->get())->toBeNull();
+    expect(resolve(ContributorsQuery::class)->get())->toBeNull();
+    Http::assertSentCount(2);
+
+    $this->travel(61)->seconds();
+
+    expect(resolve(ContributorsQuery::class)->get())->toBe([['login' => 'recovered', 'commits' => 12]]);
+    Http::assertSentCount(3);
+});
